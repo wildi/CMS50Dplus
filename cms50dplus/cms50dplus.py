@@ -111,7 +111,7 @@ class LiveDataPoint(object):
 class RecordedDataPoint(object):
     def __init__(self, time, data):
         if data[0] & 0xfe != 0xf0 or data[1] & 0x80 == 0 or data[2] & 0x80 != 0:
-           print data
+           print ('DATA: {}, Invalid data packet.'.format(data))
            raise ValueError("Invalid data packet.")
 
         self.time = time
@@ -254,8 +254,12 @@ class CMS50Dplus(object):
 
             length = (((lena & 0x7f) << 14) | ((lenb & 0x7f) << 7) | lenc) + 1
 
+            # wildi
             if length % 3 != 0:
-                raise Exception("Length not divisible by 3!")
+                # raise Exception("Length not divisible by 3!")
+                print("Length not divisible by 3!: {}".format(length % 3 ))
+                length -=length % 3
+                print("new length: {}".format(length))
 
             # Calculate length in hours, minutes, and seconds.
             s = length / 3
@@ -276,7 +280,10 @@ class CMS50Dplus(object):
                     raise Exception("Timeout during download!")
                 packet[i%3] = byte
                 if i%3 == 2:
-                    yield RecordedDataPoint(time, packet)
+                    try:
+                        yield RecordedDataPoint(time, packet)
+                    except ValueError:
+                        continue
                     time = time + datetime.timedelta(seconds=1)
                     packet = [0]*3
 
@@ -317,8 +324,8 @@ def dumpRecordedData(starttime, port, filename):
         for recordedData in oximeter.getRecordedData(starttime):
             writer.writerow(recordedData.getCsvData())
             measurements += 1
-            sys.stdout.write("\rGot {0} measurements...".format(measurements))
-            sys.stdout.flush()        
+            #wildi sys.stdout.write("\rGot {0} measurements...".format(measurements))
+            #sys.stdout.flush()
 
 def valid_datetime(s):
     try:
@@ -344,4 +351,3 @@ if __name__ == "__main__":
         print "Missing start time for RECORDED mode."
 
     print ""
-    print "Done."
