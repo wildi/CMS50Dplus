@@ -338,6 +338,7 @@ if __name__ == "__main__":
     parser.add_argument('--log-path', dest='log_path', action='store', default='/tmp/',type=str, help=': %(default)s, directory where log files is stored')
 
     subparsers = parser.add_subparsers(help='commands', dest='command')
+    subparsers.required = True
     retrieve_parser = subparsers.add_parser('retrieve', help='retrieve data from CMS50D+ device analyze')
     retrieve_parser.add_argument('--cmd-cms50dp', dest='cmd_cms50dp', action='store', default='./CMS50Dplus/cms50dplus/cms50dplus.py',type=str, help=': %(default)s, full path to CMS50D+ Python scripts')
     retrieve_parser.add_argument('--device-cms50dp', dest='device_cms50dp', action='store', default='/dev/ttyUSB0',type=str, help=': %(default)s, full path to CMS50D+ USB device')
