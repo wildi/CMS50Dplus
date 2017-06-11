@@ -88,8 +88,11 @@ class Script(object):
         self.dt_spo2_low_ends=list()
         self.spo2_bgs=list()
         self.spo2_ends=list()
+        self.spo2_mns=list()
         self.last_pr_mns=list()
         self.dt_last_pr_mns=list()
+        self.last_pr_mxs=list()
+        self.dt_last_pr_mxs=list()
         self.pulse_rate_mns=list()
         self.pulse_rate_mxs=list()
         self.dt_pulse_rate_mns=list()
@@ -191,10 +194,17 @@ class Script(object):
                 if d_dt.total_seconds() > self.duration_spo2 and spo2_mn < self.minimum_spo2:
                     # find last minimum
                     last_pr_mn=500.
+                    last_pr_mx=0.
                     dt_last_pr_mn=None
+                    dt_last_pr_mx=None
                     for dt_rbf in  reversed(ring_buffer_spo2):
                         pr_act=self.df.ix[str(dt_rbf)].iloc[0]['pulse_rate']
                         if dt_rbf > dt_spo2_bg:
+                            # find simply the max within interval dt_spo2_bg and "now"
+                            if pr_act > last_pr_mx:
+                                last_pr_mx=pr_act
+                                dt_last_pr_mx= dt_rbf
+                            
                             continue
                         if pr_act < last_pr_mn:
                             last_pr_mn=pr_act
@@ -209,7 +219,9 @@ class Script(object):
                         self.lg.debug('no minimum found: {}, {}'.format(dt_rbf, pr_act))
                         #ax.vlines(x=dt_rbf, ymin=pr_act-15, ymax=pr_act+5, color='c')
                         
-                
+                    self.last_pr_mxs.append(last_pr_mx)
+                    self.dt_last_pr_mxs.append(dt_last_pr_mx)
+                    self.spo2_mns.append(spo2_mn)
                     seconds_begin= dt_spo2_bg-self.dt_begin
                     if dt_last_pr_mn is not None:
                         d_dt_last_pr_mn= dt_spo2_bg-dt_last_pr_mn
@@ -283,7 +295,11 @@ class Script(object):
                     ax.vlines(x=self.dt_last_pr_mns[i], ymin=self.last_pr_mns[i], ymax=ymax, color='m')
                     ax.hlines(y=ymax, xmin=self.dt_last_pr_mns[i], xmax=dt_spo2_low_bg, color='b')
 
-            ax.text(self.dt_spo2_low_bgs[i],ymax+next(toggle), '{} sec'.format((self.dt_spo2_low_bgs[i]-self.dt_begin).total_seconds()),fontdict=font)
+            dt_start=(self.dt_spo2_low_bgs[i]-self.dt_begin).total_seconds()
+            d_dt=(self.dt_spo2_low_ends[i]-dt_spo2_low_bg).total_seconds()
+            mn=self.spo2_mns[i]
+            #ax.text(self.dt_spo2_low_bgs[i],ymax+next(toggle), 'at {} sec, dur: {}, mn: {}'.format(dt_start,d_dt,mn),rotation=20,verticalalignment='bottom',fontdict=font)
+            ax.text(self.dt_spo2_low_bgs[i],ymax, 'at {} sec, dur: {}, mn: {}'.format(dt_start,d_dt,mn),rotation=20,verticalalignment='bottom',fontdict=font)
 
     def display_pulse(self,ax=None):
         for i,pulse_rate_mn in enumerate(self.pulse_rate_mns):
@@ -293,7 +309,7 @@ class Script(object):
             d_dt_pr=self.dt_pulse_rate_mxs[i]-self.dt_pulse_rate_mns[i]
             ax.vlines(x=self.dt_pulse_rate_mns[i], ymin=ymin_mn, ymax=ymax_mn, color='g')
             ax.vlines(x=self.dt_pulse_rate_mxs[i], ymin=ymin_mn, ymax=self.pulse_rate_mxs[i], color='r')
-            ax.text(self.dt_pulse_rate_mxs[i],ymin_mn, '{} sec, {} db, {} sec'.format((self.dt_pulse_rate_mxs[i]-self.dt_begin).total_seconds(),pr_d,d_dt_pr.total_seconds()),fontdict=font)
+            ax.text(self.dt_pulse_rate_mxs[i],ymin_mn, 'at {} sec, {} db, {} sec'.format((self.dt_pulse_rate_mxs[i]-self.dt_begin).total_seconds(),pr_d,d_dt_pr.total_seconds()),rotation=-90,verticalalignment='top',fontdict=font)
             ax.hlines(y=ymin_mn, xmin=self.dt_pulse_rate_mns[i], xmax=self.dt_pulse_rate_mxs[i], color='b')
     
     def plot_analysis(self):
@@ -303,15 +319,14 @@ class Script(object):
         plt.show()
         
     def store_spo2(self):
-        df=pd.DataFrame({'dt_spo2_low_bg':self.dt_spo2_low_bgs,'self.dt_spo2_low_ends':self.dt_spo2_low_ends,'spo2_bg':self.spo2_bgs,'spo2_end':self.spo2_ends,'dt_last_pr_mn':self.dt_last_pr_mns,'last_pr_mn':self.last_pr_mns})
-        sdf= df[['dt_spo2_low_bg','self.dt_spo2_low_ends','spo2_bg','spo2_end','dt_last_pr_mn','last_pr_mn']]
+        df=pd.DataFrame({'dt_spo2_low_bg':self.dt_spo2_low_bgs,'dt_spo2_low_ends':self.dt_spo2_low_ends,'spo2_bg':self.spo2_bgs,'spo2_end':self.spo2_ends,'spo2_mn':self.spo2_mns,'dt_last_pr_mn':self.dt_last_pr_mns,'last_pr_mn':self.last_pr_mns,'last_pr_mx':self.last_pr_mxs})
+        sdf= df[['dt_spo2_low_bg','dt_spo2_low_ends','spo2_bg','spo2_end','spo2_mn','dt_last_pr_mn','last_pr_mn','last_pr_mx']]
         sdf.to_csv(self.pthfn_spo2)               
     
     def store_pulse(self):
         df=pd.DataFrame({'dt_pulse_rate_mn':self.dt_pulse_rate_mns,'pulse_rate_mn':self.pulse_rate_mns,'dt_pulse_rate_mx':self.dt_pulse_rate_mxs, 'pulse_rate_mx': self.pulse_rate_mxs})
         sdf= df[['dt_pulse_rate_mn','pulse_rate_mn', 'dt_pulse_rate_mx', 'pulse_rate_mx']]
         sdf.to_csv(self.pthfn_pulse)               
-
 
     
     def store_playtimes(self):
